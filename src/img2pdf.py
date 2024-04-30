@@ -23,6 +23,7 @@ import os
 import zlib
 import argparse
 from PIL import Image, TiffImagePlugin, GifImagePlugin, ImageCms
+from PIL import ExifTags
 
 if hasattr(GifImagePlugin, "LoadingStrategy"):
     # Pillow 9.0.0 started emitting all frames but the first as RGB instead of
@@ -1298,6 +1299,7 @@ class pdfdoc(object):
 def get_imgmetadata(
     imgdata, imgformat, default_dpi, colorspace, rawdata=None, rotreq=None
 ):
+
     if imgformat == ImageFormat.JPEG2000 and rawdata is not None and imgdata is None:
         # this codepath gets called if the PIL installation is not able to
         # handle JPEG2000 files
@@ -1311,7 +1313,25 @@ def get_imgmetadata(
     else:
         imgwidthpx, imgheightpx = imgdata.size
 
-        ndpi = imgdata.info.get("dpi")
+        ndpi = None
+        # For JPEG images with both EXIF tags and JFIF tags, Pillow seems reading image resolution from JFIF.
+        # However, "Preview" on Mac and "Photos" on Windows read the resolution from EXIF.
+        # We try to read the value from EXIF first
+        exif = imgdata.getexif()
+        if exif:
+            exif_res_unit = exif.get(ExifTags.Base.ResolutionUnit)
+            exif_x_res = exif.get(ExifTags.Base.XResolution)
+            exif_y_res = exif.get(ExifTags.Base.YResolution)
+            if exif_x_res and exif_y_res:
+                if (exif_res_unit == 3): # cm
+                    ndpi = (exif_x_res * 2.54, exif_y_res * 2.54)
+                else:
+                    ndpi = (exif_x_res, exif_y_res)
+
+        # if no DPI from EXIF, get it from `info`
+        if ndpi is None:
+            ndpi = imgdata.info.get("dpi")
+
         if ndpi is None:
             # the PNG plugin of PIL adds the undocumented "aspect" field instead of
             # the "dpi" field if the PNG pHYs chunk unit is not set to meters
