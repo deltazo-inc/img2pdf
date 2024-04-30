@@ -23,6 +23,7 @@ import os
 import zlib
 import argparse
 from PIL import Image, TiffImagePlugin, GifImagePlugin, ImageCms
+from PIL import ImageFile
 
 if hasattr(GifImagePlugin, "LoadingStrategy"):
     # Pillow 9.0.0 started emitting all frames but the first as RGB instead of
@@ -4121,6 +4122,15 @@ RGB.""",
         % Image.MAX_IMAGE_PIXELS,
     )
 
+    outargs.add_argument(
+        "--pillow-load-truncated",
+        action="store_true",
+        help="img2pdf uses the Python Imaging Library Pillow to read input "
+        "images. By default Pillow does not load truncated PNG files, "
+        "set this option will add ImageFile.LOAD_TRUNCATED_IMAGES and load "
+        "truncated image files ",
+    )
+
     if sys.platform == "win32":
         # on Windows, there are no default paths to search for an ICC profile
         # so make the argument required instead of optional
@@ -4443,6 +4453,9 @@ def main(argv=sys.argv):
 
     if args.pillow_limit_break:
         Image.MAX_IMAGE_PIXELS = None
+
+    if args.pillow_load_truncated:
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
 
     if args.gui:
         gui()
